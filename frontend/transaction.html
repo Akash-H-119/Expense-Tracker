@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Transaction Preview</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">ExpensePro</div>
+      <nav class="nav">
+        <a href="index.html">🏠 Home</a>
+        <a href="transactions.html">📜 Transactions</a>
+        <a href="contacts.html">👥 Contacts</a>
+      </nav>
+      <div class="side-footer">
+        <button class="theme-toggle" onclick="toggleTheme()">
+      <i class="fas fa-sun sun"></i>
+      <i class="fas fa-moon moon"></i>
+      <span class="theme-text">Theme</span>
+    </button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="header">
+        <h2>Transaction Details</h2>
+      </div>
+
+      <div id="preview" class="preview">
+        <div>Loading...</div>
+      </div>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    function getIdFromURL() {
+      const params = new URLSearchParams(location.search);
+      return params.get('id');
+    }
+
+    function renderPreview(t) {
+      const box = document.getElementById('preview');
+      box.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <h3 style="margin:0">${t.description || '—'}</h3>
+          <div style="color:gray">${new Date(t.date).toLocaleString()}</div>
+        </div>
+        <div style="text-align:right">
+          <div class="${t.direction === 'incoming' ? 'tag-incoming' : 'tag-outgoing'}" style="font-size:20px; font-weight:700;">
+            ${t.direction === 'incoming' ? '+' : '-'}₹${Number(t.amount).toFixed(2)}
+          </div>
+          <div style="margin-top:8px">
+            <button class="btn" onclick="location.href='transactions.html'">Back</button>
+            <button class="danger" style="margin-left:8px" onclick="delAndBack(${t.id})">Delete</button>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top:18px">
+        <div class="row"><strong>Category</strong><div>${t.category || '-'}</div></div>
+        <div class="row"><strong>Contact</strong><div>${t.contactName || '-'}</div></div>
+        <div class="row"><strong>Contact Phone</strong><div>${t.contactPhone || '-'}</div></div>
+        <div class="row"><strong>Direction</strong><div>${t.direction}</div></div>
+        <div class="row"><strong>Description</strong><div>${t.description || '-'}</div></div>
+        <div class="row"><strong>Date</strong><div>${new Date(t.date).toLocaleString()}</div></div>
+      </div>
+      `;
+    }
+
+    function delAndBack(id) {
+      if (!confirm('Delete this transaction?')) return;
+      deleteTransaction(id).then(() => location.href = 'transactions.html');
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const id = getIdFromURL();
+      if (!id) {
+        document.getElementById('preview').innerText = 'No id provided';
+        return;
+      }
+      getTransaction(id).then(renderPreview).catch(err => {
+        console.error(err);
+        document.getElementById('preview').innerText = 'Could not load transaction';
+      });
+    });
+  </script>
+</body>
+</html>
