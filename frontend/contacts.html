@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Contacts</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">Expense Tracker</div>
+      <nav class="nav">
+        <a href="index.html">🏠 Home</a>
+        <a href="transactions.html">📜 Transactions</a>
+        <a href="contacts.html" class="active">👥 Contacts</a>
+      </nav>
+      <div class="side-footer"><button class="theme-toggle" onclick="toggleTheme()">
+      <i class="fas fa-sun sun"></i>
+      <i class="fas fa-moon moon"></i>
+      <span class="theme-text">Theme</span>
+    </button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="header">
+        <h2>Contacts</h2>
+        <input class="search" id="contact-filter" placeholder="Filter contacts...">
+      </div>
+
+      <div style="display:flex;gap:16px;flex-wrap:wrap">
+        <div class="form-box" style="flex:1;min-width:300px">
+          <h3>Add Contact</h3>
+          <div style="display:flex;gap:8px">
+            <input id="contact-name" class="input" placeholder="Name">
+            <input id="contact-phone" class="input" placeholder="Phone">
+            <input id="contact-note" class="input" placeholder="Note">
+            <button class="btn" id="add-contact-btn">Add</button>
+          </div>
+        </div>
+
+        <div class="form-box" style="flex:1;min-width:320px">
+          <h3>Quick Send / Receive</h3>
+          <div style="display:flex;gap:8px;align-items:center">
+            <select id="quick-contact" class="select"></select>
+            <select id="quick-dir" class="select">
+              <option value="outgoing">Send (You paid)</option>
+              <option value="incoming">Receive (They paid you)</option>
+            </select>
+            <input id="quick-amt" class="input" type="number" placeholder="Amount">
+            <button class="btn" id="quick-send">Record</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="contacts" id="contacts-list" style="margin-top:12px"></div>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    function renderContacts(list) {
+      const wrap = document.getElementById('contacts-list');
+      wrap.innerHTML = '';
+      list.forEach(c => {
+        const el = document.createElement('div');
+        el.className = 'contact-card';
+        el.innerHTML = `<div>
+                          <div style="font-weight:700">${c.name}</div>
+                          <div style="color:gray;font-size:13px">${c.phone || ''} ${c.note ? '• ' + c.note : ''}</div>
+                        </div>
+                        <div style="display:flex;gap:8px;align-items:center">
+                          <button class="success" onclick="startQuick('${c.id}')">Record</button>
+                          <button class="danger" onclick="removeContact(${c.id})">Delete</button>
+                        </div>`;
+        wrap.appendChild(el);
+      });
+      // load quick contact selects
+      const sel = document.getElementById('quick-contact');
+      sel.innerHTML = '<option value="">--select contact--</option>';
+      list.forEach(c => {
+        const o = document.createElement('option');
+        o.value = c.id; o.text = c.name + (c.phone ? ' • '+c.phone : '');
+        sel.appendChild(o);
+      });
+      const sel2 = document.getElementById('quick-contact');
+      loadContactsIntoSelect(document.getElementById('quick-contact'), false);
+      loadContactsIntoSelect(document.getElementById('quick-contact'), false); // ensure filled
+    }
+
+    function startQuick(id) {
+      document.getElementById('quick-contact').value = id;
+      document.getElementById('quick-amt').focus();
+    }
+
+    function loadAndRenderContacts() {
+      fetchJSON(`${API_BASE}/contacts`).then(renderContacts);
+    }
+
+    document.getElementById('add-contact-btn').addEventListener('click', () => {
+      const name = document.getElementById('contact-name').value.trim();
+      const phone = document.getElementById('contact-phone').value.trim();
+      const note = document.getElementById('contact-note').value.trim();
+      if (!name) return alert('Enter name');
+      createContact({ name, phone, note }).then(() => {
+        document.getElementById('contact-name').value = '';
+        document.getElementById('contact-phone').value = '';
+        document.getElementById('contact-note').value = '';
+        loadAndRenderContacts();
+      });
+    });
+
+    document.getElementById('quick-send').addEventListener('click', () => {
+      const contactId = document.getElementById('quick-contact').value;
+      const dir = document.getElementById('quick-dir').value;
+      const amt = parseFloat(document.getElementById('quick-amt').value);
+      if (!contactId) return alert('Select contact');
+      if (!amt || amt <= 0) return alert('Enter valid amount');
+      createTransaction({
+        amount: amt,
+        direction: dir,
+        description: dir === 'outgoing' ? 'Payment to contact' : 'Received from contact',
+        date: new Date().toISOString(),
+        contactId: Number(contactId)
+      }).then(()=> {
+        document.getElementById('quick-amt').value = '';
+        loadAndRenderContacts();
+        alert('Recorded');
+      });
+    });
+
+    function removeContact(id) {
+      if (!confirm('Delete contact? (This will not delete transactions)')) return;
+      deleteContact(id).then(()=>loadAndRenderContacts());
+    }
+
+    document.getElementById('contact-filter').addEventListener('input', (e) => {
+      const q = e.target.value.toLowerCase();
+      fetchJSON(`${API_BASE}/contacts`).then(list => {
+        renderContacts(list.filter(c => c.name.toLowerCase().includes(q) || (c.phone||'').includes(q)));
+      })
+    });
+
+    document.addEventListener('DOMContentLoaded', () => {
+      loadAndRenderContacts();
+      loadContactsIntoSelect(document.getElementById('quick-contact'), false);
+    });
+  </script>
+</body>
+</html>

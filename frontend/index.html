@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Expense Tracker — Home</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">ExpensePro</div>
+      <nav class="nav">
+        <a href="index.html" class="active"><i class="fas fa-home"></i> Home</a>
+        <a href="transactions.html"><i class="fas fa-history"></i> Transactions</a>
+        <a href="contacts.html"><i class="fas fa-address-book"></i> Contacts</a>
+      </nav>
+      <div class="side-footer">
+        <button class="theme-toggle" onclick="toggleTheme()">
+          <i class="fas fa-sun sun"></i>
+          <i class="fas fa-moon moon"></i>
+          <span class="theme-text"></span>
+        </button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="header">
+        <div>
+          <h2>Record Expense</h2>
+          <div style="color:gray">Add your expenses and track payments</div>
+        </div>
+        <input class="search" placeholder="Search transactions..." oninput="location.href='transactions.html'"/>
+      </div>
+
+      <!-- Balance Summary -->
+      <div class="cards">
+        <div class="card balance-card">
+          <h4><i class="fas fa-wallet"></i> Total Balance</h4>
+          <div class="value" id="total-balance">₹0.00</div>
+          <div style="font-size: 12px; opacity: 0.8; margin-top: 8px;">
+            <span id="total-income">Income: ₹0.00</span> • 
+            <span id="total-expense">Expenses: ₹0.00</span>
+          </div>
+        </div>
+        
+        <div class="card income-card">
+          <h4><i class="fas fa-arrow-down success"></i> Money to Receive</h4>
+          <div class="value success" id="money-to-receive">₹0.00</div>
+          <div style="font-size: 12px; opacity: 0.8; margin-top: 8px;" id="receive-detail">
+            From contacts
+          </div>
+        </div>
+        
+        <div class="card expense-card">
+          <h4><i class="fas fa-arrow-up danger"></i> Money to Give</h4>
+          <div class="value danger" id="money-to-give">₹0.00</div>
+          <div style="font-size: 12px; opacity: 0.8; margin-top: 8px;" id="give-detail">
+            To contacts
+          </div>
+        </div>
+      </div>
+
+      <!-- Contact Balances Section -->
+      <div class="table">
+        <h3 style="display: flex; justify-content: space-between; align-items: center;">
+          <span><i class="fas fa-users"></i> Contact Balances</span>
+          <span style="font-size: 14px; color: hsl(var(--fg) / 0.7);" id="contact-balance-summary">
+            Net: ₹0.00
+          </span>
+        </h3>
+        <div id="contact-balances-list">
+          <!-- Contact balances will be loaded here -->
+        </div>
+      </div>
+
+      <!-- Expense Form -->
+      <div class="form-box">
+        <h3 style="margin-bottom: 16px;"><i class="fas fa-plus-circle"></i> Add New Expense</h3>
+        <form id="expense-form">
+          <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px;">
+            <input class="input" id="desc" placeholder="Description (eg. Lunch, Rent)" required style="flex: 2;">
+            <input class="input" id="amount" type="number" placeholder="Amount (₹)" required min="0.01" step="0.01" style="flex: 1;">
+            <select class="select" id="category" style="flex: 1;">
+              <option value="food">Food</option>
+              <option value="shopping">Shopping</option>
+              <option value="transport">Transport</option>
+              <option value="bills">Bills</option>
+              <option value="entertainment">Entertainment</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+            <input class="input" id="date" type="datetime-local" style="flex: 2;">
+            <button class="btn" type="submit" style="flex: 1;">
+              <i class="fas fa-save"></i> Add Expense
+            </button>
+          </div>
+          <div style="margin-top: 8px; color: gray; font-size: 13px">
+            Note: This form only adds expenses. For money transfers with contacts, use the Contacts page.
+          </div>
+        </form>
+      </div>
+
+      <!-- Recent Transactions -->
+      <div class="table">
+        <h3 style="display: flex; justify-content: space-between; align-items: center;">
+          <span><i class="fas fa-clock"></i> Recent Transactions</span>
+          <a href="transactions.html" style="font-size: 14px; color: hsl(var(--primary)); text-decoration: none;">
+            View All
+          </a>
+        </h3>
+        <table id="recent-table">
+          <thead><tr><th>When</th><th>Description</th><th>Category</th><th>Amount</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    // API Base URL - make sure this matches your backend
+    const API_BASE = 'http://localhost:4000/api';
+
+    document.addEventListener('DOMContentLoaded', () => {
+        // Prefill date with today
+        const dateInput = document.getElementById('date');
+        const now = new Date();
+        // Format for datetime-local input
+        const localDateTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+        dateInput.value = localDateTime;
+
+        // Load summary data
+        refreshSummaryAndRecent();
+        
+        // Test API connection
+        debugBalanceData();
+    });
+
+    async function debugBalanceData() {
+        try {
+            console.log('Testing API endpoints...');
+            
+            // Test basic transactions endpoint
+            const transactions = await fetchJSON(`${API_BASE}/transactions`);
+            console.log('✅ Transactions endpoint works:', transactions.length, 'transactions');
+            
+            // Test balance endpoint
+            const balance = await fetchJSON(`${API_BASE}/balance`);
+            console.log('✅ Balance endpoint works:', balance);
+            
+            // Test balance-summary endpoint
+            const balanceSummary = await fetchJSON(`${API_BASE}/balance-summary`);
+            console.log('✅ Balance summary endpoint works:', balanceSummary);
+            
+            return true;
+        } catch (err) {
+            console.error('❌ API Error:', err);
+            console.log('Full error details:', err.message);
+            return false;
+        }
+    }
+
+    async function refreshSummaryAndRecent() {
+        try {
+            console.log('Loading balance data...');
+            
+            // Load balance summary with fallback
+            let balanceSummary;
+            try {
+                balanceSummary = await fetchJSON(`${API_BASE}/balance-summary`);
+                console.log('Balance summary loaded:', balanceSummary);
+            } catch (err) {
+                console.error('Balance summary failed, using fallback:', err);
+                // Fallback data
+                balanceSummary = {
+                    totalBalance: 0,
+                    totalIncoming: 0,
+                    totalOutgoing: 0,
+                    moneyToReceive: 0,
+                    moneyToGive: 0
+                };
+            }
+
+            // Update main balance cards
+            document.getElementById('total-balance').innerText = formatCurrency(balanceSummary.totalBalance || 0);
+            document.getElementById('total-income').innerText = `Income: ${formatCurrency(balanceSummary.totalIncoming || 0)}`;
+            document.getElementById('total-expense').innerText = `Expenses: ${formatCurrency(balanceSummary.totalOutgoing || 0)}`;
+            
+            // Update money flow cards
+            document.getElementById('money-to-receive').innerText = formatCurrency(balanceSummary.moneyToReceive || 0);
+            document.getElementById('money-to-give').innerText = formatCurrency(balanceSummary.moneyToGive || 0);
+            
+            // Update details
+            document.getElementById('receive-detail').innerHTML = 
+                (balanceSummary.moneyToReceive > 0) ? 
+                'Contacts owe you money' : 
+                'No money to receive';
+            
+            document.getElementById('give-detail').innerHTML = 
+                (balanceSummary.moneyToGive > 0) ? 
+                'You owe contacts money' : 
+                'No money to give';
+            
+            // Load contact balances
+            await loadContactBalances();
+            
+            // Load recent transactions
+            await loadRecentTransactions();
+            
+        } catch (err) {
+            console.error('Error in refreshSummaryAndRecent:', err);
+            showNotification('Error loading data. Check console for details.', 'error');
+        }
+    }
+
+    async function loadContactBalances() {
+        try {
+            const contactBalances = await fetchJSON(`${API_BASE}/contact-balances`);
+            const container = document.getElementById('contact-balances-list');
+            
+            if (!contactBalances || contactBalances.length === 0) {
+                container.innerHTML = `
+                    <div style="text-align: center; padding: 40px; color: gray;">
+                        <i class="fas fa-users" style="font-size: 48px; margin-bottom: 16px; display: block; opacity: 0.5;"></i>
+                        No balance with contacts
+                    </div>
+                `;
+                document.getElementById('contact-balance-summary').textContent = 'Net: ₹0.00';
+                return;
+            }
+            
+            let totalNet = 0;
+            container.innerHTML = '';
+            
+            contactBalances.forEach(contact => {
+                totalNet += contact.netBalance;
+                
+                const balanceItem = document.createElement('div');
+                balanceItem.className = `contact-balance-item ${contact.netBalance > 0 ? 'positive' : 'negative'}`;
+                
+                let relationshipText = '';
+                if (contact.netBalance > 0) {
+                    relationshipText = `${contact.name} owes you`;
+                } else {
+                    relationshipText = `You owe ${contact.name}`;
+                }
+                
+                balanceItem.innerHTML = `
+                    <div style="flex: 1;">
+                        <div style="font-weight: 600; margin-bottom: 4px;">${contact.name}</div>
+                        <div style="font-size: 13px; color: hsl(var(--fg) / 0.6);">
+                            ${contact.phone || 'No phone'} • 
+                            ${relationshipText} ${formatCurrency(Math.abs(contact.netBalance))}
+                        </div>
+                    </div>
+                    <div class="${contact.netBalance > 0 ? 'tag-incoming' : 'tag-outgoing'}" style="font-size: 16px; font-weight: 600;">
+                        ${contact.netBalance > 0 ? '+' : ''}${formatCurrency(contact.netBalance)}
+                    </div>
+                `;
+                
+                // Make it clickable to view contact transactions
+                balanceItem.style.cursor = 'pointer';
+                balanceItem.onclick = () => {
+                    window.location.href = `contacts.html#contact-${contact.id}`;
+                };
+                
+                container.appendChild(balanceItem);
+            });
+            
+            // Update net summary
+            let netText = 'Net: ';
+            if (totalNet > 0) {
+                netText += `<span class="tag-incoming">You are owed ${formatCurrency(totalNet)}</span>`;
+            } else if (totalNet < 0) {
+                netText += `<span class="tag-outgoing">You owe ${formatCurrency(Math.abs(totalNet))}</span>`;
+            } else {
+                netText += `<span>${formatCurrency(totalNet)}</span>`;
+            }
+            
+            document.getElementById('contact-balance-summary').innerHTML = netText;
+            
+        } catch (err) {
+            console.error('Error loading contact balances:', err);
+            const container = document.getElementById('contact-balances-list');
+            container.innerHTML = `
+                <div style="text-align: center; padding: 20px; color: hsl(var(--danger));">
+                    <i class="fas fa-exclamation-triangle"></i> Error loading contact balances
+                </div>
+            `;
+        }
+    }
+
+    async function loadRecentTransactions() {
+        try {
+            const transactions = await fetchJSON(`${API_BASE}/transactions`);
+            const tbody = document.querySelector('#recent-table tbody');
+            
+            if (!transactions || transactions.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="4" style="text-align: center; padding: 40px; color: gray;">
+                            <i class="fas fa-receipt" style="font-size: 48px; margin-bottom: 16px; display: block; opacity: 0.5;"></i>
+                            No transactions yet
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            const recentTransactions = transactions.slice(0, 8);
+            tbody.innerHTML = '';
+            
+            recentTransactions.forEach(transaction => {
+                const tr = document.createElement('tr');
+                tr.style.cursor = 'pointer';
+                tr.onclick = () => window.location.href = `transactions.html?highlight=${transaction.id}`;
+                
+                const contactBadge = transaction.contactName ? 
+                    `<span class="tag-category" style="background: hsl(var(--primary) / 0.1); color: hsl(var(--primary)); margin-left: 8px; padding: 2px 8px; border-radius: 12px; font-size: 12px;">${transaction.contactName}</span>` : '';
+                
+                tr.innerHTML = `
+                    <td>${formatDate(transaction.date)}</td>
+                    <td>
+                        <div style="display: flex; align-items: center;">
+                            <span>${transaction.description || '—'}</span>
+                            ${contactBadge}
+                        </div>
+                    </td>
+                    <td><span class="tag-category">${transaction.category || 'other'}</span></td>
+                    <td class="${transaction.direction === 'incoming' ? 'tag-incoming' : 'tag-outgoing'}">
+                        ${transaction.direction === 'incoming' ? '+' : '-'}₹${Number(transaction.amount).toFixed(2)}
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+            
+        } catch (err) {
+            console.error('Error loading recent transactions:', err);
+            const tbody = document.querySelector('#recent-table tbody');
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="4" style="text-align: center; padding: 20px; color: hsl(var(--danger));">
+                        Error loading transactions
+                    </td>
+                </tr>
+            `;
+        }
+    }
+
+    // Utility functions
+    function formatCurrency(amount) {
+        return '₹' + Math.abs(Number(amount)).toFixed(2);
+    }
+
+    function formatDate(dateString) {
+        const date = new Date(dateString);
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+
+        if (diffMins < 1) return 'Just now';
+        if (diffMins < 60) return `${diffMins}m ago`;
+        if (diffHours < 24) return `${diffHours}h ago`;
+        if (diffDays < 7) return `${diffDays}d ago`;
+        return date.toLocaleDateString();
+    }
+
+    async function fetchJSON(url) {
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return await response.json();
+    }
+
+    function showNotification(message, type = 'info') {
+        // Simple notification - you can enhance this with a proper notification system
+        alert(`${type.toUpperCase()}: ${message}`);
+    }
+
+    // Form submission handler
+    document.getElementById('expense-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const desc = document.getElementById('desc').value.trim();
+        const amount = parseFloat(document.getElementById('amount').value);
+        const category = document.getElementById('category').value;
+        const dateVal = document.getElementById('date').value;
+        
+        // Basic validation
+        if (!amount || amount <= 0) {
+            alert('Please enter a valid amount');
+            return;
+        }
+        
+        if (!desc) {
+            alert('Please enter a description');
+            return;
+        }
+
+        try {
+            const submitBtn = document.querySelector('#expense-form button[type="submit"]');
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Adding...';
+            submitBtn.disabled = true;
+
+            // Format date properly for backend
+            const transactionDate = dateVal ? new Date(dateVal).toISOString() : new Date().toISOString();
+
+            // Create the transaction
+            await fetch(`${API_BASE}/transactions`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    amount: amount,
+                    direction: 'outgoing',
+                    description: desc,
+                    category: category,
+                    date: transactionDate,
+                    contactId: null
+                })
+            });
+
+            // Reset form but keep category and current date
+            document.getElementById('desc').value = '';
+            document.getElementById('amount').value = '';
+            const now = new Date();
+            const localDateTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+            document.getElementById('date').value = localDateTime;
+            
+            // Refresh data
+            await refreshSummaryAndRecent();
+            
+            showNotification('Expense added successfully!', 'success');
+            
+        } catch (err) {
+            console.error('Error:', err);
+            showNotification('Error adding expense: ' + (err.message || 'Check if server is running on port 4000'), 'error');
+        } finally {
+            const submitBtn = document.querySelector('#expense-form button[type="submit"]');
+            submitBtn.innerHTML = '<i class="fas fa-save"></i> Add Expense';
+            submitBtn.disabled = false;
+        }
+    });
+
+    // Theme toggle function (if not in app.js)
+    function toggleTheme() {
+        const body = document.body;
+        const currentTheme = body.getAttribute('data-theme');
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        body.setAttribute('data-theme', newTheme);
+        localStorage.setItem('theme', newTheme);
+        
+        // Update theme toggle button text
+        const themeText = document.querySelector('.theme-text');
+        if (themeText) {
+            themeText.textContent = newTheme === 'dark' ? 'Light Mode' : 'Dark Mode';
+        }
+    }
+
+    // Initialize theme
+    function initTheme() {
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        document.body.setAttribute('data-theme', savedTheme);
+        const themeText = document.querySelector('.theme-text');
+        if (themeText) {
+            themeText.textContent = savedTheme === 'dark' ? 'Light Mode' : 'Dark Mode';
+        }
+    }
+
+    // Call init theme on load
+    initTheme();
+  </script>
+</body>
+</html>
