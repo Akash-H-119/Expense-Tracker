@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Transactions</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">ExpensePro</div>
+      <nav class="nav">
+        <a href="index.html">🏠 Home</a>
+        <a href="transactions.html" class="active">📜 Transactions</a>
+        <a href="contacts.html">👥 Contacts</a>
+      </nav>
+      <div class="side-footer">
+        <button class="theme-toggle" onclick="toggleTheme()">
+      <i class="fas fa-sun sun"></i>
+      <i class="fas fa-moon moon"></i>
+      <span class="theme-text">Theme</span>
+    </button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="header">
+        <h2>Transactions</h2>
+        <input class="search" placeholder="Filter by description or contact..." id="filter-input">
+      </div>
+
+      <div class="table">
+        <table id="tx-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Description</th>
+              <th>Category</th>
+              <th>Contact</th>
+              <th>Direction</th>
+              <th>Amount</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    function renderTransactions(list) {
+      const tbody = document.querySelector('#tx-table tbody');
+      tbody.innerHTML = '';
+      list.forEach(t => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${new Date(t.date).toLocaleString()}</td>
+          <td><a href="transaction.html?id=${t.id}">${t.description || '—'}</a></td>
+          <td>${t.category || '-'}</td>
+          <td>${t.contactName || '-'}</td>
+          <td class="${directionClass(t.direction)}">${t.direction === 'incoming' ? 'Incoming' : 'Outgoing'}</td>
+          <td class="${t.direction === 'incoming' ? 'tag-incoming' : 'tag-outgoing'}">${t.direction === 'incoming' ? '+' : '-'}₹${Number(t.amount).toFixed(2)}</td>
+          <td>
+            <button class="danger" onclick="delTx(${t.id})">Delete</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function loadAndRender(filter = '') {
+      getTransactions().then(list => {
+        if (filter) {
+          const f = filter.toLowerCase();
+          list = list.filter(t => 
+            (t.description || '').toLowerCase().includes(f) || 
+            (t.contactName || '').toLowerCase().includes(f) ||
+            (t.category || '').toLowerCase().includes(f)
+          );
+        }
+        renderTransactions(list);
+      });
+    }
+
+    function delTx(id) {
+      if (!confirm('Delete this transaction?')) return;
+      deleteTransaction(id).then(() => loadAndRender(document.getElementById('filter-input').value));
+    }
+
+    document.getElementById('filter-input').addEventListener('input', (e) => loadAndRender(e.target.value));
+    document.addEventListener('DOMContentLoaded', () => loadAndRender());
+  </script>
+</body>
+</html>
